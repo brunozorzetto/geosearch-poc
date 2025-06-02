@@ -11,7 +11,7 @@ import (
 	"geosearch-poc/repository/postgres"
 	"geosearch-poc/service"
 
-	h3 "github.com/uber/h3-go/v3"
+	h3 "geosearch-poc/pkg/h3"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -86,8 +86,8 @@ func main() {
 	defer pool.Close()
 
 	// Initialize repositories
-	storeRepo := postgres.NewStoreRepository(pool)
-	productRepo := postgres.NewProductRepository(pool)
+	storeRepo := postgres.NewStoreRepository(pool).(*postgres.StoreRepository)
+	productRepo := postgres.NewProductRepository(pool).(*postgres.ProductRepository)
 
 	// Initialize H3 indexer
 	h3Indexer := h3.NewIndexer(9) // Resolution 9 for ~1km cells

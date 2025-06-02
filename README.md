@@ -1,84 +1,154 @@
 # Hiper GeoSearch
 
-A simple HTTP service built with Go and Gin.
+Hiper GeoSearch is a Go-based HTTP service for geolocation-based store and product search, using the Gin framework and Uber's H3 for spatial indexing. The project follows Clean Architecture, SOLID principles, modular design, and comprehensive testing (unit/integration). Security best practices (OWASP) are encouraged throughout the codebase.
+
+## Project Status
+- **Handlers** for health check and search are centralized in the `handlers/` folder.
+- **Domain models** for stores, products, and categories are in `domain/`.
+- **Repositories** for PostgreSQL are in `repository/postgres/`.
+- **Service** layer for search logic is in `service/`.
+- **H3 utilities** are in `pkg/h3/`.
+- **Distance calculations** are in `pkg/distance/`.
+- **Integration tests** are in `tests/integration/`.
+- **Database migrations** are in `migrations/`.
+- **Docker** is used for local development and database setup.
+
+All integration tests for the product repository are passing and cover creation, retrieval, update, deletion, and pagination, including foreign key constraints.
+
+## Requirements
+- Go 1.23+
+- Docker & Docker Compose
+- PostgreSQL with PostGIS extension
 
 ## Project Structure
-
 ```
 .
-├── handlers/         # HTTP handlers (controllers)
-│   └── health.go
-├── main.go           # Application entry point and routes
-├── Dockerfile        # Docker build file
+├── cmd/                    # Application entry points
+├── config/                 # Configuration management
+├── domain/                 # Domain models and interfaces
+├── handlers/              # HTTP handlers (controllers)
+├── migrations/            # Database migration files
+├── pkg/                   # Shared packages
+│   ├── distance/         # Distance calculation utilities
+│   └── h3/              # H3 geospatial utilities
+├── repository/           # Repository interfaces and implementations
+│   └── postgres/        # PostgreSQL implementations
+├── service/             # Business logic layer
+├── tests/               # Test files
+│   └── integration/    # Integration tests
+│       ├── config/     # Test configurations
+│       └── repository/ # Repository tests
+├── .env                 # Environment variables (development)
+├── .env.example        # Example environment variables
+├── .env.testing        # Environment variables for tests
+├── docker-compose.yml  # Docker services configuration
+├── Dockerfile         # Application container definition
 ├── go.mod            # Go module definition
 └── README.md         # Project documentation
 ```
 
-## Prerequisites
+## Setup
 
-- Go 1.22+
-- Docker
-- (Optional) Docker Compose
-
-## Running Locally
-
-1. Instale as dependências:
-
+### 1. Clone the repository
 ```bash
-go mod tidy
+git clone <repo-url>
+cd geosearch-poc
 ```
 
-2. Execute o servidor:
+### 2. Configure environment variables
+- Copy `.env.example` to `.env` for development:
+```bash
+cp .env.example .env
+```
 
+- Copy `.env.example` to `.env.testing` for tests:
+```bash
+cp .env.example .env.testing
+```
+
+Edit both files to match your environment settings.
+
+### 3. Start the database
+```bash
+docker-compose up -d
+```
+This will start a PostgreSQL instance with PostGIS.
+
+### 4. Apply database migrations
+You can use a migration tool (e.g., [golang-migrate](https://github.com/golang-migrate/migrate)) or run the SQL scripts manually:
+
+```bash
+# For development database
+psql -h localhost -U postgres -d geosearch < migrations/001_initial_schema.sql
+
+# For test database
+psql -h localhost -U postgres -d geosearch_test < migrations/001_initial_schema.sql
+```
+
+### 5. Run the application
 ```bash
 go run main.go
 ```
+The server will be available at `http://localhost:8080` (or the port set in your `.env`).
 
-3. Teste o endpoint de health:
+## Testing
 
+### Running Tests
+
+1. **Ensure test environment is ready:**
+   - PostgreSQL is running (`docker-compose up -d`)
+   - `.env.testing` is configured correctly
+   - Test database migrations are applied
+
+2. **Run all tests:**
 ```bash
-curl http://localhost:8080/health
+go test ./... -v
 ```
 
-## Rodando com Docker
-
-1. Construa a imagem:
-
+3. **Run only integration tests:**
 ```bash
-docker build -t geosearch-poc .
+go test ./tests/integration/... -v
 ```
 
-2. Suba o container:
-
+4. **Run specific test package:**
 ```bash
-docker run -p 8080:8080 geosearch-poc
+# Run repository tests
+go test ./tests/integration/repository/... -v
+
+# Run specific repository tests
+go test ./tests/integration/repository/postgres/... -v
 ```
 
-## Rodando com Docker Compose
+### Test Coverage
 
-1. Crie um arquivo `docker-compose.yml` com o conteúdo:
-
-```yaml
-version: '3.8'
-services:
-  app:
-    build: .
-    container_name: geosearch-poc
-    ports:
-      - "8080:8080"
-    environment:
-      - PORT=8080
-```
-
-2. Suba o serviço:
-
+To generate test coverage report:
 ```bash
-docker compose up --force-recreate
+go test ./... -coverprofile=coverage.out
+go tool cover -html=coverage.out
 ```
 
-## Endpoints
+## Development
 
-- `GET /health` — Health check endpoint
+### Adding New Tests
+
+1. **Integration Tests:**
+   - Place new integration tests in `tests/integration/`
+   - Follow the existing pattern of test organization
+   - Ensure proper setup and teardown of test data
+
+2. **Unit Tests:**
+   - Place unit tests alongside the code they test
+   - Use the `_test.go` suffix
+   - Follow Go's standard testing patterns
+
+### Best Practices
+
+- Write tests before implementing features (TDD)
+- Keep tests focused and isolated
+- Use meaningful test names
+- Clean up test data after each test
+- Use test fixtures when appropriate
+- Mock external dependencies
 
 ## License
 

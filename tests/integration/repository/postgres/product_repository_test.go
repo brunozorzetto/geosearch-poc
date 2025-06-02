@@ -2,16 +2,24 @@ package postgres
 
 import (
 	"context"
-	"geosearch-poc/internal/domain"
-	"geosearch-poc/internal/repository/postgres"
+	"geosearch-poc/domain"
+	"geosearch-poc/repository"
+	"geosearch-poc/repository/postgres"
 	"geosearch-poc/tests/integration/config"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestProductRepository(t *testing.T) (*postgres.ProductRepository, func()) {
+func init() {
+	// Tenta carregar o .env.testing, mas não falha se não existir
+	_ = godotenv.Load(".env.testing")
+}
+
+func setupTestProductRepository(t *testing.T) (repository.ProductRepository, *pgxpool.Pool, func()) {
 	// Create a test database configuration
 	dbConfig := config.NewTestDatabaseConfig()
 
@@ -27,24 +35,45 @@ func setupTestProductRepository(t *testing.T) (*postgres.ProductRepository, func
 		pool.Close()
 	}
 
-	return repo, cleanup
+	return repo, pool, cleanup
 }
 
 func TestProductRepository_Create(t *testing.T) {
-	repo, cleanup := setupTestProductRepository(t)
+	repo, pool, cleanup := setupTestProductRepository(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
+	// Create a test category first
+	category := &domain.Category{
+		ID:   "00000000-0000-0000-0000-000000000001",
+		Name: "Test Category",
+	}
+	categoryRepo := postgres.NewCategoryRepository(pool)
+	err := categoryRepo.Create(ctx, category)
+	require.NoError(t, err)
+
+	// Create a test store first
+	storeRepo := postgres.NewStoreRepository(pool)
+	store := &domain.Store{
+		Name:      "Test Store",
+		Category:  category.ID, // Use the ID da categoria criada
+		Latitude:  0.0,
+		Longitude: 0.0,
+		Address:   "Test Address",
+	}
+	err = storeRepo.Create(ctx, store)
+	require.NoError(t, err)
+
 	// Create a test product
 	product := &domain.Product{
-		StoreID:     "00000000-0000-0000-0000-000000000001",
+		StoreID:     store.ID, // Use the ID da loja criada
 		Name:        "Test Product",
 		Description: "Test Description",
 		Price:       99.99,
 	}
 
-	err := repo.Create(ctx, product)
+	err = repo.Create(ctx, product)
 	require.NoError(t, err)
 	assert.NotEmpty(t, product.ID)
 	assert.NotZero(t, product.CreatedAt)
@@ -52,20 +81,41 @@ func TestProductRepository_Create(t *testing.T) {
 }
 
 func TestProductRepository_GetByID(t *testing.T) {
-	repo, cleanup := setupTestProductRepository(t)
+	repo, pool, cleanup := setupTestProductRepository(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
+	// Create a test category first
+	category := &domain.Category{
+		ID:   "00000000-0000-0000-0000-000000000001",
+		Name: "Test Category",
+	}
+	categoryRepo := postgres.NewCategoryRepository(pool)
+	err := categoryRepo.Create(ctx, category)
+	require.NoError(t, err)
+
+	// Create a test store first
+	storeRepo := postgres.NewStoreRepository(pool)
+	store := &domain.Store{
+		Name:      "Test Store",
+		Category:  category.ID, // Use the ID da categoria criada
+		Latitude:  0.0,
+		Longitude: 0.0,
+		Address:   "Test Address",
+	}
+	err = storeRepo.Create(ctx, store)
+	require.NoError(t, err)
+
 	// Create a test product
 	product := &domain.Product{
-		StoreID:     "00000000-0000-0000-0000-000000000001",
+		StoreID:     store.ID, // Use the ID da loja criada
 		Name:        "Test Product",
 		Description: "Test Description",
 		Price:       99.99,
 	}
 
-	err := repo.Create(ctx, product)
+	err = repo.Create(ctx, product)
 	require.NoError(t, err)
 
 	// Retrieve the product
@@ -79,11 +129,33 @@ func TestProductRepository_GetByID(t *testing.T) {
 }
 
 func TestProductRepository_GetByStoreID(t *testing.T) {
-	repo, cleanup := setupTestProductRepository(t)
+	repo, pool, cleanup := setupTestProductRepository(t)
 	defer cleanup()
 
 	ctx := context.Background()
-	storeID := "00000000-0000-0000-0000-000000000001"
+
+	// Create a test category first
+	category := &domain.Category{
+		ID:   "00000000-0000-0000-0000-000000000001",
+		Name: "Test Category",
+	}
+	categoryRepo := postgres.NewCategoryRepository(pool)
+	err := categoryRepo.Create(ctx, category)
+	require.NoError(t, err)
+
+	// Create a test store first
+	storeRepo := postgres.NewStoreRepository(pool)
+	store := &domain.Store{
+		Name:      "Test Store",
+		Category:  category.ID, // Use the ID da categoria criada
+		Latitude:  0.0,
+		Longitude: 0.0,
+		Address:   "Test Address",
+	}
+	err = storeRepo.Create(ctx, store)
+	require.NoError(t, err)
+
+	storeID := store.ID
 
 	// Create multiple products for the same store
 	products := []*domain.Product{
@@ -113,20 +185,41 @@ func TestProductRepository_GetByStoreID(t *testing.T) {
 }
 
 func TestProductRepository_Update(t *testing.T) {
-	repo, cleanup := setupTestProductRepository(t)
+	repo, pool, cleanup := setupTestProductRepository(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
+	// Create a test category first
+	category := &domain.Category{
+		ID:   "00000000-0000-0000-0000-000000000001",
+		Name: "Test Category",
+	}
+	categoryRepo := postgres.NewCategoryRepository(pool)
+	err := categoryRepo.Create(ctx, category)
+	require.NoError(t, err)
+
+	// Create a test store first
+	storeRepo := postgres.NewStoreRepository(pool)
+	store := &domain.Store{
+		Name:      "Test Store",
+		Category:  category.ID, // Use the ID da categoria criada
+		Latitude:  0.0,
+		Longitude: 0.0,
+		Address:   "Test Address",
+	}
+	err = storeRepo.Create(ctx, store)
+	require.NoError(t, err)
+
 	// Create a test product
 	product := &domain.Product{
-		StoreID:     "00000000-0000-0000-0000-000000000001",
+		StoreID:     store.ID, // Use the ID da loja criada
 		Name:        "Test Product",
 		Description: "Test Description",
 		Price:       99.99,
 	}
 
-	err := repo.Create(ctx, product)
+	err = repo.Create(ctx, product)
 	require.NoError(t, err)
 
 	// Update the product
@@ -146,20 +239,41 @@ func TestProductRepository_Update(t *testing.T) {
 }
 
 func TestProductRepository_Delete(t *testing.T) {
-	repo, cleanup := setupTestProductRepository(t)
+	repo, pool, cleanup := setupTestProductRepository(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
+	// Create a test category first
+	category := &domain.Category{
+		ID:   "00000000-0000-0000-0000-000000000001",
+		Name: "Test Category",
+	}
+	categoryRepo := postgres.NewCategoryRepository(pool)
+	err := categoryRepo.Create(ctx, category)
+	require.NoError(t, err)
+
+	// Create a test store first
+	storeRepo := postgres.NewStoreRepository(pool)
+	store := &domain.Store{
+		Name:      "Test Store",
+		Category:  category.ID, // Use the ID da categoria criada
+		Latitude:  0.0,
+		Longitude: 0.0,
+		Address:   "Test Address",
+	}
+	err = storeRepo.Create(ctx, store)
+	require.NoError(t, err)
+
 	// Create a test product
 	product := &domain.Product{
-		StoreID:     "00000000-0000-0000-0000-000000000001",
+		StoreID:     store.ID, // Use the ID da loja criada
 		Name:        "Test Product",
 		Description: "Test Description",
 		Price:       99.99,
 	}
 
-	err := repo.Create(ctx, product)
+	err = repo.Create(ctx, product)
 	require.NoError(t, err)
 
 	// Delete the product
@@ -172,18 +286,48 @@ func TestProductRepository_Delete(t *testing.T) {
 }
 
 func TestProductRepository_GetByStoreIDs(t *testing.T) {
-	repo, cleanup := setupTestProductRepository(t)
+	repo, pool, cleanup := setupTestProductRepository(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
-	// Create products for multiple stores
-	stores := []string{
-		"00000000-0000-0000-0000-000000000001",
-		"00000000-0000-0000-0000-000000000002",
+	// Create a test category first
+	category := &domain.Category{
+		ID:   "00000000-0000-0000-0000-000000000001",
+		Name: "Test Category",
+	}
+	categoryRepo := postgres.NewCategoryRepository(pool)
+	err := categoryRepo.Create(ctx, category)
+	require.NoError(t, err)
+
+	// Create test stores first
+	storeRepo := postgres.NewStoreRepository(pool)
+	stores := []*domain.Store{
+		{
+			Name:      "Test Store 1",
+			Category:  category.ID, // Use the ID da categoria criada
+			Latitude:  0.0,
+			Longitude: 0.0,
+			Address:   "Test Address 1",
+		},
+		{
+			Name:      "Test Store 2",
+			Category:  category.ID, // Use the ID da categoria criada
+			Latitude:  0.0,
+			Longitude: 0.0,
+			Address:   "Test Address 2",
+		},
 	}
 
-	for _, storeID := range stores {
+	storeIDs := make([]string, len(stores))
+	for i, store := range stores {
+		err := storeRepo.Create(ctx, store)
+		require.NoError(t, err)
+		storeIDs[i] = store.ID
+	}
+
+	// Create products for multiple stores
+	for _, storeID := range storeIDs {
 		for i := 0; i < 3; i++ {
 			product := &domain.Product{
 				StoreID:     storeID,
@@ -197,11 +341,11 @@ func TestProductRepository_GetByStoreIDs(t *testing.T) {
 	}
 
 	// Retrieve products with limit per store
-	productsByStore, err := repo.GetByStoreIDs(ctx, stores, 2)
+	productsByStore, err := repo.GetByStoreIDs(ctx, storeIDs, 2)
 	require.NoError(t, err)
 
 	// Verify results
-	for _, storeID := range stores {
+	for _, storeID := range storeIDs {
 		products, exists := productsByStore[storeID]
 		assert.True(t, exists)
 		assert.LessOrEqual(t, len(products), 2)

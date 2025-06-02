@@ -1,7 +1,7 @@
 package h3
 
 import (
-	"github.com/uber/h3-go/v3"
+	h3 "github.com/uber/h3-go/v3"
 )
 
 // Indexer handles H3 geospatial indexing operations
@@ -18,50 +18,33 @@ func NewIndexer(resolution int) *Indexer {
 
 // LatLngToH3 converts latitude and longitude to H3 index
 func (i *Indexer) LatLngToH3(lat, lng float64) string {
-	geo := h3.LatLng{
-		Lat: lat,
-		Lng: lng,
-	}
-	index := h3.LatLngToCell(geo, i.resolution)
-	return index.String()
+	index := h3.FromGeo(h3.GeoCoord{Latitude: lat, Longitude: lng}, i.resolution)
+	return h3.ToString(index)
 }
 
 // GetNeighbors returns the H3 indexes of neighboring cells
 func (i *Indexer) GetNeighbors(h3Index string) ([]string, error) {
-	index, err := h3.ParseCell(h3Index)
-	if err != nil {
-		return nil, err
-	}
-
-	neighbors := h3.GridDisk(index, 1)
+	index := h3.FromString(h3Index) // This will panic if the string is invalid
+	neighbors := h3.KRing(index, 1)
 	result := make([]string, len(neighbors))
 	for j, n := range neighbors {
-		result[j] = n.String()
+		result[j] = h3.ToString(n)
 	}
 	return result, nil
 }
 
 // GetCellsInRadius returns all H3 cells within a specified radius (in meters)
 func (i *Indexer) GetCellsInRadius(lat, lng float64, radiusMeters float64) ([]string, error) {
-	geo := h3.LatLng{
-		Lat: lat,
-		Lng: lng,
+	center := h3.FromGeo(h3.GeoCoord{Latitude: lat, Longitude: lng}, i.resolution)
+	k := int(radiusMeters / 1000)
+	if k < 1 {
+		k = 1
 	}
-
-	// Convert radius to appropriate resolution
-	resolution := i.getResolutionForRadius(radiusMeters)
-
-	// Get the center cell
-	center := h3.LatLngToCell(geo, resolution)
-
-	// Get all cells within the radius
-	cells := h3.GridDiskDistances(center, int(radiusMeters/1000)) // Convert meters to kilometers
-
-	result := make([]string, 0)
-	for _, cell := range cells {
-		result = append(result, cell.String())
+	cells := h3.KRing(center, k)
+	result := make([]string, len(cells))
+	for j, n := range cells {
+		result[j] = h3.ToString(n)
 	}
-
 	return result, nil
 }
 
