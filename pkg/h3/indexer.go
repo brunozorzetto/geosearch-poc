@@ -1,6 +1,8 @@
 package h3
 
 import (
+	"math"
+
 	h3 "github.com/uber/h3-go/v3"
 )
 
@@ -61,4 +63,36 @@ func (i *Indexer) getResolutionForRadius(radiusMeters float64) int {
 	} else {
 		return 6
 	}
+}
+
+// GetH3IndexesInRadius returns all H3 indexes within a given radius (in meters) from a center index
+func (i *Indexer) GetH3IndexesInRadius(centerIndex string, radiusInMeters float64) []string {
+	// Convert radius from meters to H3 resolution
+	// Each H3 resolution has an approximate edge length
+	// Resolution 9: ~174m
+	// Resolution 8: ~392m
+	// Resolution 7: ~880m
+	// Resolution 6: ~1.97km
+	// Resolution 5: ~4.42km
+	// Resolution 4: ~9.93km
+	// Resolution 3: ~22.3km
+	// Resolution 2: ~50.1km
+	// Resolution 1: ~112.6km
+	// Resolution 0: ~252.9km
+
+	// Calculate the k-ring size based on the radius
+	// We use a conservative approach by using a larger k-ring
+	k := int(math.Ceil(radiusInMeters / 174.0)) // Using resolution 9 as base
+
+	// Get the k-ring of indexes
+	indexes := make([]string, 0)
+	center := h3.FromString(centerIndex)
+	ring := h3.KRing(center, k)
+
+	// Convert back to strings
+	for _, index := range ring {
+		indexes = append(indexes, h3.ToString(index))
+	}
+
+	return indexes
 }

@@ -37,15 +37,15 @@ func NewDatabaseConfig() *DatabaseConfig {
 
 // NewTestDatabaseConfig creates a new database configuration for testing
 func NewTestDatabaseConfig() *DatabaseConfig {
-	port, _ := strconv.Atoi(getEnv("TEST_DB_PORT", "5432"))
-	poolSize, _ := strconv.Atoi(getEnv("TEST_DB_POOL_SIZE", "5"))
+	port, _ := strconv.Atoi(getEnv("DB_PORT", "5432"))
+	poolSize, _ := strconv.Atoi(getEnv("DB_POOL_SIZE", "5"))
 
 	return &DatabaseConfig{
-		Host:     getEnv("TEST_DB_HOST", "localhost"),
+		Host:     getEnv("DB_HOST", "postgres"),
 		Port:     port,
-		User:     getEnv("TEST_DB_USER", "postgres"),
-		Password: getEnv("TEST_DB_PASSWORD", "postgres"),
-		DBName:   getEnv("TEST_DB_NAME", "geosearch_test"),
+		User:     getEnv("DB_USER", "postgres"),
+		Password: getEnv("DB_PASSWORD", "postgres"),
+		DBName:   getEnv("DB_NAME", "geosearch_test"),
 		PoolSize: poolSize,
 	}
 }

@@ -44,7 +44,6 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	}
 
 	// Optional parameters
-	category := c.Query("category")
 	limit := 10 // default limit
 	if limitStr := c.Query("limit"); limitStr != "" {
 		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
@@ -61,7 +60,6 @@ func (h *SearchHandler) Search(c *gin.Context) {
 
 	// Create search parameters
 	params := domain.NewSearchParams(lat, lng, radius).
-		WithCategory(category).
 		WithPagination(limit, offset)
 
 	// Perform search
@@ -71,5 +69,36 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	// Add delivery radius information to the response
+	type StoreResponse struct {
+		ID             int     `json:"id"`
+		Name           string  `json:"name"`
+		Latitude       float64 `json:"latitude"`
+		Longitude      float64 `json:"longitude"`
+		H3Index        string  `json:"h3_index"`
+		DeliveryRadius int     `json:"delivery_radius"` // in meters
+		Distance       float64 `json:"distance"`        // in kilometers
+	}
+
+	response := struct {
+		Stores []StoreResponse `json:"stores"`
+		Total  int             `json:"total"`
+	}{
+		Stores: make([]StoreResponse, len(result.Stores)),
+		Total:  result.Total,
+	}
+
+	for i, store := range result.Stores {
+		response.Stores[i] = StoreResponse{
+			ID:             store.Store.ID,
+			Name:           store.Store.Name,
+			Latitude:       store.Store.Latitude,
+			Longitude:      store.Store.Longitude,
+			H3Index:        store.Store.H3Index,
+			DeliveryRadius: store.Store.DeliveryRadius,
+			Distance:       store.Distance,
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }

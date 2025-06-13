@@ -4,74 +4,44 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TestDatabaseConfig holds the test database configuration
-type TestDatabaseConfig struct {
+// DatabaseConfig holds the database configuration
+type DatabaseConfig struct {
 	Host     string
-	Port     int
+	Port     string
 	User     string
 	Password string
 	DBName   string
-	PoolSize int
 }
 
-// NewTestDatabaseConfig creates a new test database configuration
-func NewTestDatabaseConfig() *TestDatabaseConfig {
-	port, _ := strconv.Atoi(getEnv("TEST_DB_PORT", "5432"))
-	poolSize, _ := strconv.Atoi(getEnv("TEST_DB_POOL_SIZE", "5"))
-
-	return &TestDatabaseConfig{
-		Host:     getEnv("TEST_DB_HOST", "localhost"),
-		Port:     port,
-		User:     getEnv("TEST_DB_USER", "postgres"),
-		Password: getEnv("TEST_DB_PASSWORD", "postgres"),
-		DBName:   getEnv("TEST_DB_NAME", "geosearch_test"),
-		PoolSize: poolSize,
+// NewTestDatabaseConfig creates a new database configuration for tests
+func NewTestDatabaseConfig() *DatabaseConfig {
+	return &DatabaseConfig{
+		Host:     getEnv("DB_HOST", "localhost"),
+		Port:     getEnv("DB_PORT", "5433"),
+		User:     getEnv("DB_USER", "postgres"),
+		Password: getEnv("DB_PASSWORD", "postgres"),
+		DBName:   getEnv("DB_NAME", "geosearch_test"),
 	}
 }
 
-// GetDSN returns the database connection string
-func (c *TestDatabaseConfig) GetDSN() string {
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		c.User,
-		c.Password,
-		c.Host,
-		c.Port,
-		c.DBName,
+// NewPool creates a new connection pool
+func (c *DatabaseConfig) NewPool() (*pgxpool.Pool, error) {
+	connString := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		c.Host, c.Port, c.User, c.Password, c.DBName,
 	)
-}
 
-// NewPool creates a new database connection pool
-func (c *TestDatabaseConfig) NewPool() (*pgxpool.Pool, error) {
-	config, err := pgxpool.ParseConfig(c.GetDSN())
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse database config: %w", err)
-	}
-
-	config.MaxConns = int32(c.PoolSize)
-	config.MinConns = 1
-	config.MaxConnLifetime = time.Hour
-	config.MaxConnIdleTime = 30 * time.Minute
-
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create connection pool: %w", err)
-	}
-
-	return pool, nil
+	return pgxpool.New(context.Background(), connString)
 }
 
 // getEnv gets an environment variable or returns a default value
 func getEnv(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
+	if value, exists := os.LookupEnv(key); exists {
+		return value
 	}
-	return value
+	return defaultValue
 }

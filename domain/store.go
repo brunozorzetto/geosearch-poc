@@ -4,39 +4,38 @@ import (
 	"time"
 )
 
-// Store represents a physical store location
+// Store represents a store in the system
 type Store struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Category  string    `json:"category"`
-	Latitude  float64   `json:"latitude"`
-	Longitude float64   `json:"longitude"`
-	H3Index   string    `json:"h3_index"`
-	Address   string    `json:"address"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID             int       `json:"id"`
+	Name           string    `json:"name"`
+	Latitude       float64   `json:"latitude"`
+	Longitude      float64   `json:"longitude"`
+	H3Index        string    `json:"h3_index"`
+	DeliveryRadius int       `json:"delivery_radius"` // Maximum delivery radius in meters
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // NewStore creates a new store instance
-func NewStore(name, category string, latitude, longitude float64, address string) *Store {
+func NewStore(name string, latitude, longitude float64, h3Index string, deliveryRadius int) *Store {
 	now := time.Now()
 	return &Store{
-		Name:      name,
-		Category:  category,
-		Latitude:  latitude,
-		Longitude: longitude,
-		Address:   address,
-		CreatedAt: now,
-		UpdatedAt: now,
+		Name:           name,
+		Latitude:       latitude,
+		Longitude:      longitude,
+		H3Index:        h3Index,
+		DeliveryRadius: deliveryRadius,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 }
 
 // Update updates the store information
-func (s *Store) Update(name, category string, latitude, longitude float64, address string) {
+func (s *Store) Update(name string, latitude, longitude float64, h3Index string, deliveryRadius int) {
 	s.Name = name
-	s.Category = category
 	s.Latitude = latitude
 	s.Longitude = longitude
-	s.Address = address
+	s.H3Index = h3Index
+	s.DeliveryRadius = deliveryRadius
 	s.UpdatedAt = time.Now()
 }

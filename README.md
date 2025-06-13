@@ -1,19 +1,17 @@
 # Hiper GeoSearch
 
-Hiper GeoSearch is a Go-based HTTP service for geolocation-based store and product search, using the Gin framework and Uber's H3 for spatial indexing. The project follows Clean Architecture, SOLID principles, modular design, and comprehensive testing (unit/integration). Security best practices (OWASP) are encouraged throughout the codebase.
+Hiper GeoSearch is a Go-based HTTP service for geolocation-based store search using the Gin framework and Uber's H3 for spatial indexing. The project follows Clean Architecture, SOLID principles, modular design, and comprehensive testing (unit/integration). Security best practices (OWASP) are encouraged throughout the codebase.
 
 ## Project Status
-- **Handlers** for health check and search are centralized in the `handlers/` folder.
-- **Domain models** for stores, products, and categories are in `domain/`.
+- **Handlers** for health check and store search are centralized in the `handlers/` folder.
+- **Domain models** for stores and search are in `domain/`.
 - **Repositories** for PostgreSQL are in `repository/postgres/`.
-- **Service** layer for search logic is in `service/`.
+- **Service** layer for store search logic is in `service/`.
 - **H3 utilities** are in `pkg/h3/`.
 - **Distance calculations** are in `pkg/distance/`.
 - **Integration tests** are in `tests/integration/`.
 - **Database migrations** are in `migrations/`.
 - **Docker** is used for local development and database setup.
-
-All integration tests for the product repository are passing and cover creation, retrieval, update, deletion, and pagination, including foreign key constraints.
 
 ## Requirements
 - Go 1.23+
@@ -26,6 +24,8 @@ All integration tests for the product repository are passing and cover creation,
 ├── cmd/                    # Application entry points
 ├── config/                 # Configuration management
 ├── domain/                 # Domain models and interfaces
+│   ├── store.go           # Store domain model
+│   └── search.go          # Search domain model
 ├── handlers/              # HTTP handlers (controllers)
 ├── migrations/            # Database migration files
 ├── pkg/                   # Shared packages
@@ -90,6 +90,38 @@ psql -h localhost -U postgres -d geosearch_test < migrations/001_initial_schema.
 go run main.go
 ```
 The server will be available at `http://localhost:8080` (or the port set in your `.env`).
+
+## Running Integration Tests
+
+To run the integration tests in an isolated environment using Docker Compose, simply execute:
+
+```bash
+./tests/run_tests.sh
+```
+
+This script will:
+- Remove any previous test containers to avoid conflicts
+- Build the test environment using the Dockerfile and docker-compose located in `tests/`
+- Run all integration tests inside a container
+- Clean up all resources after the tests finish
+
+**Requirements:**
+- Docker and Docker Compose installed
+- The `.env.testing` file must exist in the project root with the correct test database configuration
+
+If you want to run the tests manually:
+
+```bash
+cd tests
+./run_tests.sh
+```
+
+Or directly with Docker Compose:
+
+```bash
+cd tests
+docker-compose -f docker-compose.test.yml up --build
+```
 
 ## Testing
 

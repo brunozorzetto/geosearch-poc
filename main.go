@@ -87,13 +87,12 @@ func main() {
 
 	// Initialize repositories
 	storeRepo := postgres.NewStoreRepository(pool).(*postgres.StoreRepository)
-	productRepo := postgres.NewProductRepository(pool).(*postgres.ProductRepository)
 
 	// Initialize H3 indexer
 	h3Indexer := h3.NewIndexer(9) // Resolution 9 for ~1km cells
 
 	// Initialize services
-	searchService := service.NewSearchService(storeRepo, productRepo, h3Indexer, 10)
+	searchService := service.NewSearchService(storeRepo, h3Indexer)
 
 	// Initialize handlers
 	searchHandler := handlers.NewSearchHandler(searchService)
