@@ -1,121 +1,99 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
-	"os"
-	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 
 	"geosearch-poc/config"
 	"geosearch-poc/handlers"
+	"geosearch-poc/pkg/h3"
 	"geosearch-poc/repository/postgres"
 	"geosearch-poc/service"
-
-	h3 "geosearch-poc/pkg/h3"
-
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
+	"geosearch-poc/service/vertexai"
 )
 
-// Config holds all configuration for the application
-type Config struct {
-	Port        string
-	Mode        string
-	AppName     string
-	AppVersion  string
-	ReadTimeout time.Duration
-}
-
-// loadConfig loads configuration from environment variables
-func loadConfig() *Config {
-	// Carrega o arquivo .env se ele existir
-	if err := godotenv.Load(); err != nil {
-		log.Println("Arquivo .env não encontrado, usando variáveis de ambiente do sistema")
-	}
-
-	// Define valores padrão
-	config := &Config{
-		Port:        getEnv("PORT", "8080"),
-		Mode:        getEnv("GIN_MODE", "debug"),
-		AppName:     getEnv("APP_NAME", "geosearch-poc"),
-		AppVersion:  getEnv("APP_VERSION", "1.0.0"),
-		ReadTimeout: 10 * time.Second,
-	}
-
-	return config
-}
-
-// getEnv gets an environment variable or returns a default value
-func getEnv(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
 func main() {
-	// Carrega configurações
-	appConfig := loadConfig()
-
-	// Configura o modo do Gin
-	gin.SetMode(appConfig.Mode)
-
-	// Cria uma nova instância do Gin com configurações personalizadas
-	r := gin.New()
-
-	// Middleware global
-	r.Use(gin.Logger())
-	r.Use(gin.Recovery())
-
-	// Adiciona informações da aplicação ao contexto
-	r.Use(func(c *gin.Context) {
-		c.Set("app_name", appConfig.AppName)
-		c.Set("app_version", appConfig.AppVersion)
-		c.Next()
-	})
-
-	// Load database configuration
-	dbConfig := config.NewDatabaseConfig()
-
-	// Create database connection
-	pool, err := dbConfig.NewPool()
-	if err != nil {
-		log.Fatalf("Failed to create database pool: %v", err)
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
 	}
-	defer pool.Close()
+
+	// Load configuration
+	appConfig, err := config.Load()
+	if err != nil {
+		log.Fatal("Error loading configuration:", err)
+	}
+
+	// Initialize database connection
+	db, err := pgxpool.New(context.Background(), appConfig.Database.URL)
+	if err != nil {
+		log.Fatal("Error connecting to database:", err)
+	}
+	defer db.Close()
 
 	// Initialize repositories
-	storeRepo := postgres.NewStoreRepository(pool).(*postgres.StoreRepository)
+	storeRepo := postgres.NewStoreRepository(db)
+	productRepo := postgres.NewProductRepository(db)
 
 	// Initialize H3 indexer
 	h3Indexer := h3.NewIndexer(9) // Resolution 9 for ~1km cells
 
+	// Initialize Vertex AI client
+	vertexAIClient, err := vertexai.NewClient(
+		appConfig.GoogleCloud.ProjectID,
+		appConfig.GoogleCloud.Location,
+		appConfig.GoogleCloud.Catalog,
+		appConfig.GoogleCloud.CredentialsFile,
+	)
+	if err != nil {
+		log.Fatal("Error initializing Vertex AI client:", err)
+	}
+	defer vertexAIClient.Close()
+
 	// Initialize services
-	searchService := service.NewSearchService(storeRepo, h3Indexer)
+	storeSearchService := service.NewStoreSearchService(storeRepo, h3Indexer)
+	productSearchService := service.NewProductSearchService(productRepo, storeRepo, h3Indexer, vertexAIClient)
 
 	// Initialize handlers
-	searchHandler := handlers.NewSearchHandler(searchService)
+	searchHandler := handlers.NewSearchHandler(storeSearchService)
+	storeHandler := handlers.NewStoreHandler(storeRepo, h3Indexer)
+	productHandler := handlers.NewProductHandler(productRepo, productSearchService)
 
-	// Registra rotas
-	r.GET("/health", handlers.HealthCheck)
+	// Initialize router
+	router := gin.Default()
 
-	// API routes
-	api := r.Group("/api/v1")
+	// Register routes
+	api := router.Group("/api/v1")
 	{
 		// Search routes
-		search := api.Group("/search")
+		api.GET("/search", searchHandler.Search)
+
+		// Store routes
+		stores := api.Group("/stores")
 		{
-			search.GET("/stores", searchHandler.Search)
+			stores.POST("", storeHandler.Create)
+			stores.GET("/:id", storeHandler.GetByID)
+			stores.PUT("/:id", storeHandler.Update)
+			stores.DELETE("/:id", storeHandler.Delete)
+		}
+
+		// Product routes
+		products := api.Group("/products")
+		{
+			products.POST("", productHandler.Create)
+			products.GET("/:id", productHandler.GetByID)
+			products.PUT("/:id", productHandler.Update)
+			products.DELETE("/:id", productHandler.Delete)
+			products.GET("/search", productHandler.Search)
 		}
 	}
 
-	// Configura o servidor
-	serverAddr := fmt.Sprintf(":%s", appConfig.Port)
-	log.Printf("Starting %s v%s on %s", appConfig.AppName, appConfig.AppVersion, serverAddr)
-
-	// Inicia o servidor
-	if err := r.Run(serverAddr); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	// Start server
+	if err := router.Run(":8080"); err != nil {
+		log.Fatal("Error starting server:", err)
 	}
 }

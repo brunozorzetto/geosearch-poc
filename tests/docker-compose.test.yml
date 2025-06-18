@@ -10,21 +10,22 @@ services:
     env_file:
       - ../.env.testing
     depends_on:
-      postgres:
+      postgres-test:
         condition: service_healthy
 
-  postgres:
+  postgres-test:
     image: postgis/postgis:15-3.3
     container_name: geosearch-postgres-test
-    env_file:
-      - ../.env.testing
+    environment:
+      POSTGRES_DB: geosearch_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5433:5432"
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
-      - ../migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d geosearch_test"]
       interval: 5s
       timeout: 5s
       retries: 5

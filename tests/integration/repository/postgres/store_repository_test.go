@@ -10,6 +10,7 @@ import (
 	"geosearch-poc/pkg/h3"
 	"geosearch-poc/repository/postgres"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,30 +23,40 @@ func TestStoreRepository_GetByH3Indexes(t *testing.T) {
 	require.NoError(t, err)
 	defer pool.Close()
 
+	// Clean database
+	_, _ = pool.Exec(ctx, "TRUNCATE TABLE products, stores RESTART IDENTITY CASCADE")
+
 	repo := postgres.NewStoreRepository(pool)
 	indexer := h3.NewIndexer(9)
 
 	// Create test stores
 	stores := []*domain.Store{
-		{
-			Name:           "Store 1",
-			Latitude:       -23.550520,
-			Longitude:      -46.633308,
-			H3Index:        indexer.LatLngToH3(-23.550520, -46.633308),
-			DeliveryRadius: 5000, // 5km
-		},
-		{
-			Name:           "Store 2",
-			Latitude:       -23.560520,
-			Longitude:      -46.643308,
-			H3Index:        indexer.LatLngToH3(-23.560520, -46.643308),
-			DeliveryRadius: 3000, // 3km
-		},
-	}
-
-	for _, store := range stores {
-		err := repo.Create(ctx, store)
-		require.NoError(t, err)
+		domain.NewStore(
+			"Store 1",
+			uuid.Nil,
+			-23.550520,
+			-46.633308,
+			func() string {
+				h3Index, err := indexer.GetCellFromLatLng(-23.550520, -46.633308)
+				require.NoError(t, err)
+				return h3Index
+			}(),
+			"Rua Teste, 123",
+			5000, // 5km
+		),
+		domain.NewStore(
+			"Store 2",
+			uuid.Nil,
+			-23.560520,
+			-46.643308,
+			func() string {
+				h3Index, err := indexer.GetCellFromLatLng(-23.560520, -46.643308)
+				require.NoError(t, err)
+				return h3Index
+			}(),
+			"Rua Teste, 456",
+			3000, // 3km
+		),
 	}
 
 	// Test cases
@@ -62,7 +73,7 @@ func TestStoreRepository_GetByH3Indexes(t *testing.T) {
 			check: func(t *testing.T, stores []*domain.Store) {
 				require.Len(t, stores, 1)
 				assert.Equal(t, "Store 1", stores[0].Name)
-				assert.Equal(t, 5000, stores[0].DeliveryRadius)
+				assert.Equal(t, float64(5000), stores[0].DeliveryRadius)
 			},
 		},
 		{
@@ -85,9 +96,9 @@ func TestStoreRepository_GetByH3Indexes(t *testing.T) {
 				// Check delivery radius
 				for _, store := range stores {
 					if store.Name == "Store 1" {
-						assert.Equal(t, 5000, store.DeliveryRadius)
+						assert.Equal(t, float64(5000), store.DeliveryRadius)
 					} else if store.Name == "Store 2" {
-						assert.Equal(t, 3000, store.DeliveryRadius)
+						assert.Equal(t, float64(3000), store.DeliveryRadius)
 					}
 				}
 			},
@@ -96,6 +107,15 @@ func TestStoreRepository_GetByH3Indexes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Clean database before each test to avoid interference
+			_, _ = pool.Exec(ctx, "TRUNCATE TABLE products, stores RESTART IDENTITY CASCADE")
+
+			// Recreate test stores
+			for _, store := range stores {
+				err := repo.Create(ctx, store)
+				require.NoError(t, err)
+			}
+
 			got, err := repo.GetByH3Indexes(ctx, tt.h3Indexes)
 			require.NoError(t, err)
 			assert.Len(t, got, tt.want)
@@ -116,6 +136,9 @@ func TestStoreRepository_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	defer pool.Close()
 
+	// Clean database
+	_, _ = pool.Exec(ctx, "TRUNCATE TABLE products, stores RESTART IDENTITY CASCADE")
+
 	repo := postgres.NewStoreRepository(pool)
 	indexer := h3.NewIndexer(9)
 
@@ -130,13 +153,19 @@ func TestStoreRepository_CRUD(t *testing.T) {
 		{
 			name: "should create and read store",
 			setup: func() *domain.Store {
-				return &domain.Store{
-					Name:           "Test Store",
-					Latitude:       -23.550520,
-					Longitude:      -46.633308,
-					H3Index:        indexer.LatLngToH3(-23.550520, -46.633308),
-					DeliveryRadius: 5000, // 5km
-				}
+				return domain.NewStore(
+					"Test Store",
+					uuid.Nil,
+					-23.550520,
+					-46.633308,
+					func() string {
+						h3Index, err := indexer.GetCellFromLatLng(-23.550520, -46.633308)
+						require.NoError(t, err)
+						return h3Index
+					}(),
+					"Rua Teste, 123",
+					5000, // 5km
+				)
 			},
 			action: func(t *testing.T, store *domain.Store) {
 				err := repo.Create(ctx, store)
@@ -161,13 +190,19 @@ func TestStoreRepository_CRUD(t *testing.T) {
 		{
 			name: "should update store",
 			setup: func() *domain.Store {
-				store := &domain.Store{
-					Name:           "Test Store",
-					Latitude:       -23.550520,
-					Longitude:      -46.633308,
-					H3Index:        indexer.LatLngToH3(-23.550520, -46.633308),
-					DeliveryRadius: 5000, // 5km
-				}
+				store := domain.NewStore(
+					"Test Store",
+					uuid.Nil,
+					-23.550520,
+					-46.633308,
+					func() string {
+						h3Index, err := indexer.GetCellFromLatLng(-23.550520, -46.633308)
+						require.NoError(t, err)
+						return h3Index
+					}(),
+					"Rua Teste, 123",
+					5000, // 5km
+				)
 				err := repo.Create(ctx, store)
 				require.NoError(t, err)
 				return store
@@ -183,7 +218,7 @@ func TestStoreRepository_CRUD(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, got)
 				assert.Equal(t, "Updated Store", got.Name)
-				assert.Equal(t, 3000, got.DeliveryRadius)
+				assert.Equal(t, float64(3000), got.DeliveryRadius)
 			},
 			cleanup: func(t *testing.T, store *domain.Store) {
 				err := repo.Delete(ctx, store.ID)
@@ -193,13 +228,19 @@ func TestStoreRepository_CRUD(t *testing.T) {
 		{
 			name: "should delete store",
 			setup: func() *domain.Store {
-				store := &domain.Store{
-					Name:           "Test Store",
-					Latitude:       -23.550520,
-					Longitude:      -46.633308,
-					H3Index:        indexer.LatLngToH3(-23.550520, -46.633308),
-					DeliveryRadius: 5000, // 5km
-				}
+				store := domain.NewStore(
+					"Test Store",
+					uuid.Nil,
+					-23.550520,
+					-46.633308,
+					func() string {
+						h3Index, err := indexer.GetCellFromLatLng(-23.550520, -46.633308)
+						require.NoError(t, err)
+						return h3Index
+					}(),
+					"Rua Teste, 123",
+					5000, // 5km
+				)
 				err := repo.Create(ctx, store)
 				require.NoError(t, err)
 				return store
@@ -244,6 +285,9 @@ func TestStoreRepository_SearchByRadius(t *testing.T) {
 	require.NoError(t, err)
 	defer pool.Close()
 
+	// Clean database
+	_, _ = pool.Exec(ctx, "TRUNCATE TABLE products, stores RESTART IDENTITY CASCADE")
+
 	repo := postgres.NewStoreRepository(pool)
 	indexer := h3.NewIndexer(9)
 
@@ -253,27 +297,45 @@ func TestStoreRepository_SearchByRadius(t *testing.T) {
 
 	// Create test stores
 	stores := []*domain.Store{
-		{
-			Name:           "Store 1",
-			Latitude:       -23.550520,
-			Longitude:      -46.633308,
-			H3Index:        indexer.LatLngToH3(-23.550520, -46.633308),
-			DeliveryRadius: 1000, // 1km
-		},
-		{
-			Name:           "Store 2",
-			Latitude:       -23.560520,
-			Longitude:      -46.643308,
-			H3Index:        indexer.LatLngToH3(-23.560520, -46.643308),
-			DeliveryRadius: 2000, // 2km
-		},
-		{
-			Name:           "Store 3",
-			Latitude:       -23.570520,
-			Longitude:      -46.653308,
-			H3Index:        indexer.LatLngToH3(-23.570520, -46.653308),
-			DeliveryRadius: 500, // 0.5km, não deve aparecer nos testes
-		},
+		domain.NewStore(
+			"Store 1",
+			uuid.Nil,
+			-23.550520,
+			-46.633308,
+			func() string {
+				h3Index, err := indexer.GetCellFromLatLng(-23.550520, -46.633308)
+				require.NoError(t, err)
+				return h3Index
+			}(),
+			"Rua Teste, 123",
+			1000, // 1km
+		),
+		domain.NewStore(
+			"Store 2",
+			uuid.Nil,
+			-23.560520,
+			-46.643308,
+			func() string {
+				h3Index, err := indexer.GetCellFromLatLng(-23.560520, -46.643308)
+				require.NoError(t, err)
+				return h3Index
+			}(),
+			"Rua Teste, 456",
+			2000, // 2km
+		),
+		domain.NewStore(
+			"Store 3",
+			uuid.Nil,
+			-23.570520,
+			-46.653308,
+			func() string {
+				h3Index, err := indexer.GetCellFromLatLng(-23.570520, -46.653308)
+				require.NoError(t, err)
+				return h3Index
+			}(),
+			"Rua Teste, 789",
+			500, // 0.5km, não deve aparecer nos testes
+		),
 	}
 
 	for _, store := range stores {

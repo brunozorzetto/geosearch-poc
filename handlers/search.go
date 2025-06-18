@@ -12,17 +12,17 @@ import (
 
 // SearchHandler handles store search requests
 type SearchHandler struct {
-	searchService *service.SearchService
+	storeSearchService *service.StoreSearchService
 }
 
 // NewSearchHandler creates a new search handler instance
-func NewSearchHandler(searchService *service.SearchService) *SearchHandler {
+func NewSearchHandler(storeSearchService *service.StoreSearchService) *SearchHandler {
 	return &SearchHandler{
-		searchService: searchService,
+		storeSearchService: storeSearchService,
 	}
 }
 
-// Search handles the store search endpoint
+// Search handles store search requests
 func (h *SearchHandler) Search(c *gin.Context) {
 	// Parse query parameters
 	lat, err := strconv.ParseFloat(c.Query("lat"), 64)
@@ -43,62 +43,23 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		return
 	}
 
-	// Optional parameters
-	limit := 10 // default limit
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
-			limit = parsedLimit
-		}
-	}
-
-	offset := 0 // default offset
-	if offsetStr := c.Query("offset"); offsetStr != "" {
-		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
-			offset = parsedOffset
-		}
-	}
-
 	// Create search parameters
-	params := domain.NewSearchParams(lat, lng, radius).
-		WithPagination(limit, offset)
+	params := domain.StoreSearchParams{
+		Latitude:  lat,
+		Longitude: lng,
+		Radius:    radius,
+	}
 
-	// Perform search
-	result, err := h.searchService.SearchStores(c.Request.Context(), params)
+	// Execute search
+	stores, err := h.storeSearchService.Search(c.Request.Context(), params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search stores"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Add delivery radius information to the response
-	type StoreResponse struct {
-		ID             int     `json:"id"`
-		Name           string  `json:"name"`
-		Latitude       float64 `json:"latitude"`
-		Longitude      float64 `json:"longitude"`
-		H3Index        string  `json:"h3_index"`
-		DeliveryRadius int     `json:"delivery_radius"` // in meters
-		Distance       float64 `json:"distance"`        // in kilometers
-	}
-
-	response := struct {
-		Stores []StoreResponse `json:"stores"`
-		Total  int             `json:"total"`
-	}{
-		Stores: make([]StoreResponse, len(result.Stores)),
-		Total:  result.Total,
-	}
-
-	for i, store := range result.Stores {
-		response.Stores[i] = StoreResponse{
-			ID:             store.Store.ID,
-			Name:           store.Store.Name,
-			Latitude:       store.Store.Latitude,
-			Longitude:      store.Store.Longitude,
-			H3Index:        store.Store.H3Index,
-			DeliveryRadius: store.Store.DeliveryRadius,
-			Distance:       store.Distance,
-		}
-	}
-
-	c.JSON(http.StatusOK, response)
+	// Return results
+	c.JSON(http.StatusOK, gin.H{
+		"stores": stores,
+		"total":  len(stores),
+	})
 }

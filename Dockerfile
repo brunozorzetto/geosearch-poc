@@ -22,6 +22,7 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+COPY migrations ./migrations
 
 # Build the application with CGO enabled
 RUN go build -o main .
@@ -42,6 +43,7 @@ WORKDIR /app
 
 # Copy the binary from builder
 COPY --from=builder /app/main .
+COPY --from=builder /app/migrations ./migrations
 
 # Expose port 8080
 EXPOSE 8080

@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
@@ -37,11 +36,11 @@ func NewDatabaseConfig() *DatabaseConfig {
 
 // NewTestDatabaseConfig creates a new database configuration for testing
 func NewTestDatabaseConfig() *DatabaseConfig {
-	port, _ := strconv.Atoi(getEnv("DB_PORT", "5432"))
+	port, _ := strconv.Atoi(getEnv("DB_PORT", "5433"))
 	poolSize, _ := strconv.Atoi(getEnv("DB_POOL_SIZE", "5"))
 
 	return &DatabaseConfig{
-		Host:     getEnv("DB_HOST", "postgres"),
+		Host:     getEnv("DB_HOST", "localhost"),
 		Port:     port,
 		User:     getEnv("DB_USER", "postgres"),
 		Password: getEnv("DB_PASSWORD", "postgres"),
@@ -80,13 +79,4 @@ func (c *DatabaseConfig) NewPool() (*pgxpool.Pool, error) {
 	}
 
 	return pool, nil
-}
-
-// getEnv gets an environment variable or returns a default value
-func getEnv(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return value
 }

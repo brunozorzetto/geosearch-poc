@@ -185,3 +185,11 @@ go tool cover -html=coverage.out
 ## License
 
 [Add your license here] 
+
+# Executar todos os testes
+./tests/run_tests.sh
+
+# Executar testes específicos
+go test -v ./tests/unit/...           # Testes unitários
+go test -v ./tests/integration/...    # Testes de integração
+go test -v ./tests/integration/handlers/...  # Testes de handlers 

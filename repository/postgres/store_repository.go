@@ -3,10 +3,12 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"geosearch-poc/domain"
 	"geosearch-poc/repository"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -25,17 +27,25 @@ func NewStoreRepository(pool *pgxpool.Pool) repository.StoreRepository {
 // Create creates a new store
 func (r *StoreRepository) Create(ctx context.Context, store *domain.Store) error {
 	query := `
-		INSERT INTO stores (name, latitude, longitude, h3_index, delivery_radius)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id`
+		INSERT INTO stores (
+			id, name, category_id, latitude, longitude, h3_index, address, delivery_radius, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+		)
+	`
 
-	err := r.pool.QueryRow(ctx, query,
+	_, err := r.pool.Exec(ctx, query,
+		store.ID,
 		store.Name,
+		store.CategoryID,
 		store.Latitude,
 		store.Longitude,
 		store.H3Index,
+		store.Address,
 		store.DeliveryRadius,
-	).Scan(&store.ID)
+		store.CreatedAt,
+		store.UpdatedAt,
+	)
 
 	if err != nil {
 		return fmt.Errorf("failed to create store: %w", err)
@@ -45,9 +55,9 @@ func (r *StoreRepository) Create(ctx context.Context, store *domain.Store) error
 }
 
 // GetByID retrieves a store by its ID
-func (r *StoreRepository) GetByID(ctx context.Context, id int) (*domain.Store, error) {
+func (r *StoreRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Store, error) {
 	query := `
-		SELECT id, name, latitude, longitude, h3_index, delivery_radius, created_at, updated_at
+		SELECT id, name, category_id, latitude, longitude, h3_index, address, delivery_radius, created_at, updated_at
 		FROM stores
 		WHERE id = $1`
 
@@ -55,9 +65,11 @@ func (r *StoreRepository) GetByID(ctx context.Context, id int) (*domain.Store, e
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&store.ID,
 		&store.Name,
+		&store.CategoryID,
 		&store.Latitude,
 		&store.Longitude,
 		&store.H3Index,
+		&store.Address,
 		&store.DeliveryRadius,
 		&store.CreatedAt,
 		&store.UpdatedAt,
@@ -73,7 +85,7 @@ func (r *StoreRepository) GetByID(ctx context.Context, id int) (*domain.Store, e
 // GetByH3Index retrieves stores by their H3 index
 func (r *StoreRepository) GetByH3Index(ctx context.Context, h3Index string) ([]*domain.Store, error) {
 	query := `
-		SELECT id, name, latitude, longitude, h3_index, delivery_radius, created_at, updated_at
+		SELECT id, name, category_id, latitude, longitude, h3_index, address, delivery_radius, created_at, updated_at
 		FROM stores
 		WHERE h3_index = $1`
 
@@ -89,9 +101,11 @@ func (r *StoreRepository) GetByH3Index(ctx context.Context, h3Index string) ([]*
 		err := rows.Scan(
 			&store.ID,
 			&store.Name,
+			&store.CategoryID,
 			&store.Latitude,
 			&store.Longitude,
 			&store.H3Index,
+			&store.Address,
 			&store.DeliveryRadius,
 			&store.CreatedAt,
 			&store.UpdatedAt,
@@ -112,7 +126,7 @@ func (r *StoreRepository) GetByH3Index(ctx context.Context, h3Index string) ([]*
 // GetByH3Indexes retrieves stores by multiple H3 indexes
 func (r *StoreRepository) GetByH3Indexes(ctx context.Context, h3Indexes []string) ([]*domain.Store, error) {
 	query := `
-		SELECT id, name, latitude, longitude, h3_index, delivery_radius, created_at, updated_at
+		SELECT id, name, category_id, latitude, longitude, h3_index, address, delivery_radius, created_at, updated_at
 		FROM stores
 		WHERE h3_index = ANY($1)`
 
@@ -128,9 +142,11 @@ func (r *StoreRepository) GetByH3Indexes(ctx context.Context, h3Indexes []string
 		err := rows.Scan(
 			&store.ID,
 			&store.Name,
+			&store.CategoryID,
 			&store.Latitude,
 			&store.Longitude,
 			&store.H3Index,
+			&store.Address,
 			&store.DeliveryRadius,
 			&store.CreatedAt,
 			&store.UpdatedAt,
@@ -152,15 +168,18 @@ func (r *StoreRepository) GetByH3Indexes(ctx context.Context, h3Indexes []string
 func (r *StoreRepository) Update(ctx context.Context, store *domain.Store) error {
 	query := `
 		UPDATE stores
-		SET name = $1, latitude = $2, longitude = $3, h3_index = $4, delivery_radius = $5
-		WHERE id = $6`
+		SET name = $1, category_id = $2, latitude = $3, longitude = $4, h3_index = $5, address = $6, delivery_radius = $7, updated_at = $8
+		WHERE id = $9`
 
 	_, err := r.pool.Exec(ctx, query,
 		store.Name,
+		store.CategoryID,
 		store.Latitude,
 		store.Longitude,
 		store.H3Index,
+		store.Address,
 		store.DeliveryRadius,
+		store.UpdatedAt,
 		store.ID,
 	)
 
@@ -172,7 +191,7 @@ func (r *StoreRepository) Update(ctx context.Context, store *domain.Store) error
 }
 
 // Delete deletes a store by its ID
-func (r *StoreRepository) Delete(ctx context.Context, id int) error {
+func (r *StoreRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM stores WHERE id = $1`
 
 	_, err := r.pool.Exec(ctx, query, id)
@@ -186,7 +205,7 @@ func (r *StoreRepository) Delete(ctx context.Context, id int) error {
 // Search searches for stores based on criteria
 func (r *StoreRepository) Search(ctx context.Context, params *domain.SearchParams) ([]*domain.Store, int, error) {
 	query := `
-		SELECT id, name, latitude, longitude, h3_index, delivery_radius, created_at, updated_at
+		SELECT id, name, category_id, latitude, longitude, h3_index, address, delivery_radius, created_at, updated_at
 		FROM stores
 		WHERE ST_DWithin(
 			ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
@@ -196,15 +215,20 @@ func (r *StoreRepository) Search(ctx context.Context, params *domain.SearchParam
 		AND delivery_radius >= ST_Distance(
 			ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
 			ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
-		)`
+		) / 1000
+		ORDER BY ST_Distance(
+			ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
+			ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+		)
+		LIMIT $4 OFFSET $5`
 
-	args := []interface{}{params.Longitude, params.Latitude, params.Radius}
-
-	// Add pagination
-	query += " LIMIT $4 OFFSET $5"
-	args = append(args, params.Limit, params.Offset)
-
-	rows, err := r.pool.Query(ctx, query, args...)
+	rows, err := r.pool.Query(ctx, query,
+		params.Longitude,
+		params.Latitude,
+		params.Radius,
+		params.Limit,
+		params.Offset,
+	)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query stores: %w", err)
 	}
@@ -216,9 +240,11 @@ func (r *StoreRepository) Search(ctx context.Context, params *domain.SearchParam
 		err := rows.Scan(
 			&store.ID,
 			&store.Name,
+			&store.CategoryID,
 			&store.Latitude,
 			&store.Longitude,
 			&store.H3Index,
+			&store.Address,
 			&store.DeliveryRadius,
 			&store.CreatedAt,
 			&store.UpdatedAt,
@@ -245,10 +271,14 @@ func (r *StoreRepository) Search(ctx context.Context, params *domain.SearchParam
 		AND delivery_radius >= ST_Distance(
 			ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
 			ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
-		)`
+		) / 1000`
 
 	var total int
-	err = r.pool.QueryRow(ctx, countQuery, params.Longitude, params.Latitude, params.Radius).Scan(&total)
+	err = r.pool.QueryRow(ctx, countQuery,
+		params.Longitude,
+		params.Latitude,
+		params.Radius,
+	).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get total count: %w", err)
 	}
@@ -297,6 +327,44 @@ func (r *StoreRepository) SearchByRadius(ctx context.Context, latitude, longitud
 	}
 
 	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating store rows: %w", err)
+	}
+
+	return stores, nil
+}
+
+func (r *StoreRepository) GetByH3Cells(ctx context.Context, h3Cells []string) ([]domain.Store, error) {
+	query := `
+		SELECT id, name, address, latitude, longitude, h3_index, delivery_radius, created_at, updated_at
+		FROM stores
+		WHERE h3_index = ANY($1)
+	`
+
+	rows, err := r.pool.Query(ctx, query, h3Cells)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query stores by H3 cells: %w", err)
+	}
+	defer rows.Close()
+
+	var stores []domain.Store
+	for rows.Next() {
+		var s domain.Store
+		var createdAt, updatedAt time.Time
+
+		err := rows.Scan(
+			&s.ID, &s.Name, &s.Address, &s.Latitude, &s.Longitude, &s.H3Index, &s.DeliveryRadius,
+			&createdAt, &updatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan store row: %w", err)
+		}
+
+		s.CreatedAt = createdAt
+		s.UpdatedAt = updatedAt
+		stores = append(stores, s)
+	}
+
+	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating store rows: %w", err)
 	}
 
