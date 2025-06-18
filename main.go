@@ -40,7 +40,7 @@ func main() {
 	productRepo := postgres.NewProductRepository(db)
 
 	// Initialize H3 indexer
-	h3Indexer := h3.NewIndexer(9) // Resolution 9 for ~1km cells
+	h3Indexer := h3.NewIndexer(appConfig.H3.Resolution) // Use resolution from config
 
 	// Initialize Vertex AI client
 	vertexAIClient, err := vertexai.NewClient(

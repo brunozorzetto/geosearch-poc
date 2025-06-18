@@ -28,4 +28,8 @@ go.work
 Thumbs.db
 
 # Environment variables
-.env 
+.env
+
+# Google Cloud credentials
+credentials/
+*.json 

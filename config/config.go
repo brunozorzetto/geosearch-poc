@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -23,6 +24,9 @@ type Config struct {
 		Location        string
 		Catalog         string
 		CredentialsFile string
+	}
+	H3 struct {
+		Resolution int
 	}
 }
 
@@ -50,6 +54,9 @@ func Load() (*Config, error) {
 	config.GoogleCloud.Location = getEnv("GOOGLE_CLOUD_LOCATION", "")
 	config.GoogleCloud.Catalog = getEnv("GOOGLE_CLOUD_CATALOG", "")
 	config.GoogleCloud.CredentialsFile = getEnv("GOOGLE_CLOUD_CREDENTIALS_FILE", "")
+
+	// Load H3 configuration
+	config.H3.Resolution = getEnvInt("H3_RESOLUTION", 9)
 
 	// Validate required configuration
 	if config.Database.URL == "" {
@@ -82,4 +89,17 @@ func getEnv(key, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+// getEnvInt gets an environment variable as an integer or returns a default value
+func getEnvInt(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return intValue
 }
