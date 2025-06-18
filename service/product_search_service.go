@@ -16,14 +16,14 @@ type ProductSearchService struct {
 	productRepo repository.ProductRepository
 	storeRepo   repository.StoreRepository
 	h3Indexer   H3Indexer
-	vertexAI    *vertexai.Client
+	vertexAI    vertexai.VertexAIClientInterface
 }
 
 func NewProductSearchService(
 	productRepo repository.ProductRepository,
 	storeRepo repository.StoreRepository,
 	h3Indexer H3Indexer,
-	vertexAI *vertexai.Client,
+	vertexAI vertexai.VertexAIClientInterface,
 ) *ProductSearchService {
 	return &ProductSearchService{
 		productRepo: productRepo,
@@ -131,4 +131,9 @@ func convertToProduct(result vertexai.SearchResult) domain.Product {
 		CreatedAt:   result.CreatedAt,
 		UpdatedAt:   result.UpdatedAt,
 	}
+}
+
+// GetVertexAIClient returns the Vertex AI client for external operations
+func (s *ProductSearchService) GetVertexAIClient() vertexai.VertexAIClientInterface {
+	return s.vertexAI
 }

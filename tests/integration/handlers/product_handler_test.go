@@ -17,6 +17,7 @@ import (
 	"geosearch-poc/service"
 	"geosearch-poc/service/vertexai"
 
+	retail "cloud.google.com/go/retail/apiv2/retailpb"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,10 +41,10 @@ func setupProductHandlerTest(t *testing.T) (*handlers.ProductHandler, *pgxpool.P
 	h3Indexer := h3.NewIndexer(9)
 
 	// Setup Vertex AI client (mock for testing)
-	vertexAIClient := &vertexai.Client{} // Mock client
+	mockVertexAI := &MockVertexAIClient{}
 
 	// Setup services
-	productSearchService := service.NewProductSearchService(productRepo, storeRepo, h3Indexer, vertexAIClient)
+	productSearchService := service.NewProductSearchService(productRepo, storeRepo, h3Indexer, mockVertexAI)
 
 	// Setup handler
 	handler := handlers.NewProductHandler(productRepo, productSearchService)
@@ -54,6 +55,38 @@ func setupProductHandlerTest(t *testing.T) (*handlers.ProductHandler, *pgxpool.P
 	}
 
 	return handler, db, cleanup
+}
+
+// MockVertexAIClient is a mock implementation of the Vertex AI client for testing
+type MockVertexAIClient struct {
+	searchResults []vertexai.SearchResult
+	searchError   error
+	createError   error
+	updateError   error
+	deleteError   error
+}
+
+func (m *MockVertexAIClient) Search(ctx context.Context, params vertexai.SearchParams) ([]vertexai.SearchResult, string, error) {
+	if m.searchError != nil {
+		return nil, "", m.searchError
+	}
+	return m.searchResults, "", nil
+}
+
+func (m *MockVertexAIClient) CreateProduct(ctx context.Context, product *retail.Product) error {
+	return m.createError
+}
+
+func (m *MockVertexAIClient) UpdateProduct(ctx context.Context, product *retail.Product) error {
+	return m.updateError
+}
+
+func (m *MockVertexAIClient) DeleteProduct(ctx context.Context, productID string) error {
+	return m.deleteError
+}
+
+func (m *MockVertexAIClient) Close() error {
+	return nil
 }
 
 func TestProductHandler_Create(t *testing.T) {
@@ -650,4 +683,227 @@ func TestProductHandler_Search(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProductHandler_Create_WithRetailSearchSync(t *testing.T) {
+	handler, db, cleanup := setupProductHandlerTest(t)
+	defer cleanup()
+
+	// Setup Gin router
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/products", handler.Create)
+
+	// Create a test store first
+	storeRepo := postgres.NewStoreRepository(db)
+	testStore := &domain.Store{
+		ID:             uuid.New(),
+		Name:           "Test Store for Retail Search Sync",
+		CategoryID:     uuid.Nil,
+		Latitude:       -23.550520,
+		Longitude:      -46.633308,
+		H3Index:        "8928308280fffff",
+		Address:        "Rua Teste, 123",
+		DeliveryRadius: 5.0,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	err := storeRepo.Create(context.Background(), testStore)
+	require.NoError(t, err)
+
+	// Test payload
+	payload := map[string]interface{}{
+		"store_id":    testStore.ID.String(),
+		"name":        "Test Product for Retail Search",
+		"description": "A test product for Retail Search sync",
+		"price":       29.99,
+		"category":    "Electronics",
+		"brand":       "TestBrand",
+		"sku":         "TEST-SKU-RETAIL-001",
+		"stock":       100,
+		"h3_index":    "8928308280fffff",
+		"images":      []string{"https://example.com/image1.jpg"},
+	}
+
+	// Create request
+	payloadBytes, _ := json.Marshal(payload)
+	req := httptest.NewRequest("POST", "/products", bytes.NewBuffer(payloadBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create response recorder
+	w := httptest.NewRecorder()
+
+	// Execute request
+	router.ServeHTTP(w, req)
+
+	// Assert status code
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	// Parse response
+	var response map[string]interface{}
+	err = json.Unmarshal(w.Body.Bytes(), &response)
+	require.NoError(t, err)
+
+	// Verify product was created
+	assert.NotEmpty(t, response["id"])
+	assert.Equal(t, payload["name"], response["name"])
+	assert.Equal(t, payload["store_id"], response["store_id"])
+
+	// Note: The Retail Search sync happens asynchronously, so we can't directly test it here
+	// In a real integration test, you would wait for the async operation to complete
+	// and then verify the product exists in Retail Search
+}
+
+func TestProductHandler_Update_WithRetailSearchSync(t *testing.T) {
+	handler, db, cleanup := setupProductHandlerTest(t)
+	defer cleanup()
+
+	// Setup Gin router
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.PUT("/products/:id", handler.Update)
+
+	// Create a test store and product
+	storeRepo := postgres.NewStoreRepository(db)
+	productRepo := postgres.NewProductRepository(db)
+
+	testStore := &domain.Store{
+		ID:             uuid.New(),
+		Name:           "Test Store for Update Sync",
+		CategoryID:     uuid.Nil,
+		Latitude:       -23.550520,
+		Longitude:      -46.633308,
+		H3Index:        "8928308280fffff",
+		Address:        "Rua Teste, 123",
+		DeliveryRadius: 5.0,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	testProduct := domain.NewProduct(
+		testStore.ID,
+		"Test Product for Update",
+		"Test product description",
+		29.99,
+		"Electronics",
+		"TestBrand",
+		"TEST-SKU-UPDATE-SYNC-001",
+		100,
+		"8928308280fffff",
+		[]string{"https://example.com/image1.jpg"},
+	)
+
+	err := storeRepo.Create(context.Background(), testStore)
+	require.NoError(t, err)
+
+	err = productRepo.Create(context.Background(), testProduct)
+	require.NoError(t, err)
+
+	// Update payload
+	updatePayload := map[string]interface{}{
+		"name":        "Updated Product Name",
+		"description": "Updated product description",
+		"price":       39.99,
+		"category":    "Updated Electronics",
+		"brand":       "UpdatedBrand",
+		"sku":         "UPDATED-SKU-SYNC-001",
+		"stock":       150,
+		"h3_index":    "8928308280fffff",
+		"images":      []string{"https://example.com/updated-image.jpg"},
+	}
+
+	// Create request
+	payloadBytes, _ := json.Marshal(updatePayload)
+	req := httptest.NewRequest("PUT", fmt.Sprintf("/products/%s", testProduct.ID.String()), bytes.NewBuffer(payloadBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create response recorder
+	w := httptest.NewRecorder()
+
+	// Execute request
+	router.ServeHTTP(w, req)
+
+	// Assert status code
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Parse response
+	var response map[string]interface{}
+	err = json.Unmarshal(w.Body.Bytes(), &response)
+	require.NoError(t, err)
+
+	// Verify product was updated
+	assert.Equal(t, testProduct.ID.String(), response["id"])
+	assert.Equal(t, updatePayload["name"], response["name"])
+	assert.Equal(t, updatePayload["price"], response["price"])
+
+	// Note: The Retail Search sync happens asynchronously, so we can't directly test it here
+	// In a real integration test, you would wait for the async operation to complete
+	// and then verify the product was updated in Retail Search
+}
+
+func TestProductHandler_Delete_WithRetailSearchSync(t *testing.T) {
+	handler, db, cleanup := setupProductHandlerTest(t)
+	defer cleanup()
+
+	// Setup Gin router
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.DELETE("/products/:id", handler.Delete)
+
+	// Create a test store and product
+	storeRepo := postgres.NewStoreRepository(db)
+	productRepo := postgres.NewProductRepository(db)
+
+	testStore := &domain.Store{
+		ID:             uuid.New(),
+		Name:           "Test Store for Delete Sync",
+		CategoryID:     uuid.Nil,
+		Latitude:       -23.550520,
+		Longitude:      -46.633308,
+		H3Index:        "8928308280fffff",
+		Address:        "Rua Teste, 123",
+		DeliveryRadius: 5.0,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	testProduct := domain.NewProduct(
+		testStore.ID,
+		"Test Product for Delete",
+		"Test product description",
+		29.99,
+		"Electronics",
+		"TestBrand",
+		"TEST-SKU-DELETE-SYNC-001",
+		100,
+		"8928308280fffff",
+		[]string{"https://example.com/image1.jpg"},
+	)
+
+	err := storeRepo.Create(context.Background(), testStore)
+	require.NoError(t, err)
+
+	err = productRepo.Create(context.Background(), testProduct)
+	require.NoError(t, err)
+
+	// Create request
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("/products/%s", testProduct.ID.String()), nil)
+
+	// Create response recorder
+	w := httptest.NewRecorder()
+
+	// Execute request
+	router.ServeHTTP(w, req)
+
+	// Assert status code
+	assert.Equal(t, http.StatusNoContent, w.Code)
+
+	// Verify product is actually deleted from database
+	_, err = productRepo.GetByID(context.Background(), testProduct.ID)
+	assert.Error(t, err) // Should return error as product is deleted
+
+	// Note: The Retail Search sync happens asynchronously, so we can't directly test it here
+	// In a real integration test, you would wait for the async operation to complete
+	// and then verify the product was deleted from Retail Search
 }

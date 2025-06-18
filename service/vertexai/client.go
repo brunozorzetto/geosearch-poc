@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 // Client represents a Vertex AI Retail Search client
@@ -197,6 +198,39 @@ func (c *Client) CreateProduct(ctx context.Context, product *retailpb.Product) e
 	_, err := c.productClient.CreateProduct(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to create product: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) UpdateProduct(ctx context.Context, product *retailpb.Product) error {
+	req := &retailpb.UpdateProductRequest{
+		Product: product,
+		UpdateMask: &fieldmaskpb.FieldMask{
+			Paths: []string{
+				"title", "description", "price_info", "categories", "brands",
+				"gtin", "availability", "attributes", "images",
+			},
+		},
+	}
+
+	_, err := c.productClient.UpdateProduct(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to update product: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) DeleteProduct(ctx context.Context, productID string) error {
+	req := &retailpb.DeleteProductRequest{
+		Name: fmt.Sprintf("projects/%s/locations/%s/catalogs/%s/branches/default_branch/products/%s",
+			c.projectID, c.location, c.catalog, productID),
+	}
+
+	err := c.productClient.DeleteProduct(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to delete product: %w", err)
 	}
 
 	return nil

@@ -1,0 +1,753 @@
+{
+	"info": {
+		"_postman_id": "geosearch-poc-api-collection",
+		"name": "GeoSearch POC API",
+		"description": "Collection completa para testar todos os endpoints da API GeoSearch POC\n\nEsta API permite:\n- Gerenciar stores (lojas) com localização geográfica\n- Gerenciar produtos associados a stores\n- Buscar stores por proximidade geográfica\n- Buscar produtos usando Vertex AI Search\n\nBase URL: http://localhost:8080/api/v1",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "geosearch-poc"
+	},
+	"item": [
+		{
+			"name": "Stores",
+			"description": "Endpoints para gerenciamento de stores (lojas)",
+			"item": [
+				{
+					"name": "Create Store",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Loja Exemplo\",\n  \"latitude\": -23.550520,\n  \"longitude\": -46.633308,\n  \"address\": \"Av. Paulista, 1000\",\n  \"delivery_radius\": 5.0\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stores",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stores"
+							]
+						},
+						"description": "Cria uma nova store com localização geográfica e raio de entrega"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Store with Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Loja com Categoria\",\n  \"category_id\": \"{{category_id}}\",\n  \"latitude\": -23.551520,\n  \"longitude\": -46.634308,\n  \"address\": \"Rua Augusta, 500\",\n  \"delivery_radius\": 3.0\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stores",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stores"
+							]
+						},
+						"description": "Cria uma store com categoria específica"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Store by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/stores/{{store_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stores",
+								"{{store_id}}"
+							]
+						},
+						"description": "Busca uma store específica pelo ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Store",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Loja Atualizada\",\n  \"latitude\": -23.560520,\n  \"longitude\": -46.643308,\n  \"address\": \"Rua Atualizada, 456\",\n  \"delivery_radius\": 7.0\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stores/{{store_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stores",
+								"{{store_id}}"
+							]
+						},
+						"description": "Atualiza os dados de uma store existente"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Store",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/stores/{{store_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stores",
+								"{{store_id}}"
+							]
+						},
+						"description": "Remove uma store do sistema"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Products",
+			"description": "Endpoints para gerenciamento de produtos",
+			"item": [
+				{
+					"name": "Create Product",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"name\": \"Produto Exemplo\",\n  \"description\": \"Descrição do produto exemplo\",\n  \"price\": 29.99,\n  \"category\": \"Electronics\",\n  \"brand\": \"Marca Exemplo\",\n  \"sku\": \"PROD-001\",\n  \"stock\": 100,\n  \"h3_index\": \"8928308280fffff\",\n  \"images\": [\n    \"https://example.com/image1.jpg\",\n    \"https://example.com/image2.jpg\"\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						},
+						"description": "Cria um novo produto associado a uma store"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product (Minimal)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"name\": \"Produto Mínimo\",\n  \"price\": 19.99,\n  \"sku\": \"PROD-MIN-001\",\n  \"stock\": 50\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						},
+						"description": "Cria um produto com apenas os campos obrigatórios"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Product by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products/{{product_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"{{product_id}}"
+							]
+						},
+						"description": "Busca um produto específico pelo ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Product",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Produto Atualizado\",\n  \"description\": \"Nova descrição do produto\",\n  \"price\": 39.99,\n  \"category\": \"Updated Electronics\",\n  \"brand\": \"Updated Brand\",\n  \"sku\": \"UPDATED-SKU-001\",\n  \"stock\": 150,\n  \"h3_index\": \"8928308280fffff\",\n  \"images\": [\n    \"https://example.com/updated-image.jpg\"\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products/{{product_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"{{product_id}}"
+							]
+						},
+						"description": "Atualiza os dados de um produto existente"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Product (Partial)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Produto Parcialmente Atualizado\",\n  \"price\": 49.99,\n  \"stock\": 200\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products/{{product_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"{{product_id}}"
+							]
+						},
+						"description": "Atualiza apenas alguns campos do produto"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Product",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products/{{product_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"{{product_id}}"
+							]
+						},
+						"description": "Remove um produto do sistema"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Search",
+			"description": "Endpoints para busca geográfica e de produtos",
+			"item": [
+				{
+					"name": "Search Stores by Location",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/search?lat=-23.550520&lng=-46.633308&radius=5.0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"search"
+							],
+							"query": [
+								{
+									"key": "lat",
+									"value": "-23.550520",
+									"description": "Latitude do ponto de busca"
+								},
+								{
+									"key": "lng",
+									"value": "-46.633308",
+									"description": "Longitude do ponto de busca"
+								},
+								{
+									"key": "radius",
+									"value": "5.0",
+									"description": "Raio de busca em quilômetros"
+								}
+							]
+						},
+						"description": "Busca stores próximas a uma localização específica"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Stores (1km radius)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/search?lat=-23.550520&lng=-46.633308&radius=1.0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"search"
+							],
+							"query": [
+								{
+									"key": "lat",
+									"value": "-23.550520"
+								},
+								{
+									"key": "lng",
+									"value": "-46.633308"
+								},
+								{
+									"key": "radius",
+									"value": "1.0"
+								}
+							]
+						},
+						"description": "Busca stores em um raio de 1km"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products/search?q=smartphone&lat=-23.550520&lng=-46.633308&radius=5.0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "smartphone",
+									"description": "Termo de busca"
+								},
+								{
+									"key": "lat",
+									"value": "-23.550520",
+									"description": "Latitude do ponto de busca"
+								},
+								{
+									"key": "lng",
+									"value": "-46.633308",
+									"description": "Longitude do ponto de busca"
+								},
+								{
+									"key": "radius",
+									"value": "5.0",
+									"description": "Raio de busca em quilômetros"
+								}
+							]
+						},
+						"description": "Busca produtos usando Vertex AI Search com filtros geográficos"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Products with Filters",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products/search?q=electronics&lat=-23.550520&lng=-46.633308&radius=5.0&category=Electronics&brand=Apple&min_price=100&max_price=1000&page_size=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "electronics"
+								},
+								{
+									"key": "lat",
+									"value": "-23.550520"
+								},
+								{
+									"key": "lng",
+									"value": "-46.633308"
+								},
+								{
+									"key": "radius",
+									"value": "5.0"
+								},
+								{
+									"key": "category",
+									"value": "Electronics",
+									"description": "Filtrar por categoria"
+								},
+								{
+									"key": "brand",
+									"value": "Apple",
+									"description": "Filtrar por marca"
+								},
+								{
+									"key": "min_price",
+									"value": "100",
+									"description": "Preço mínimo"
+								},
+								{
+									"key": "max_price",
+									"value": "1000",
+									"description": "Preço máximo"
+								},
+								{
+									"key": "page_size",
+									"value": "20",
+									"description": "Número de resultados por página"
+								}
+							]
+						},
+						"description": "Busca produtos com filtros avançados (categoria, marca, preço, paginação)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Error Examples",
+			"description": "Exemplos de requisições que geram erros para testar validações",
+			"item": [
+				{
+					"name": "Create Store - Missing Required Fields",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Loja sem campos obrigatórios\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stores",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stores"
+							]
+						},
+						"description": "Tenta criar uma store sem os campos obrigatórios (latitude/longitude)"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Store - Invalid Category ID",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Loja com categoria inválida\",\n  \"category_id\": \"invalid-uuid\",\n  \"latitude\": -23.550520,\n  \"longitude\": -46.633308,\n  \"address\": \"Rua Teste, 123\",\n  \"delivery_radius\": 5.0\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stores",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stores"
+							]
+						},
+						"description": "Tenta criar uma store com category_id inválido"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product - Missing Required Fields",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Produto sem campos obrigatórios\",\n  \"price\": 29.99\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						},
+						"description": "Tenta criar um produto sem os campos obrigatórios (store_id, sku, stock)"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product - Invalid Store ID",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"store_id\": \"invalid-uuid\",\n  \"name\": \"Produto com store inválida\",\n  \"price\": 29.99,\n  \"sku\": \"PROD-ERROR-001\",\n  \"stock\": 100\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products"
+							]
+						},
+						"description": "Tenta criar um produto com store_id inválido"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Store - Invalid UUID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/stores/invalid-uuid",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stores",
+								"invalid-uuid"
+							]
+						},
+						"description": "Tenta buscar uma store com UUID inválido"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Store - Non-existent",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/stores/00000000-0000-0000-0000-000000000000",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stores",
+								"00000000-0000-0000-0000-000000000000"
+							]
+						},
+						"description": "Tenta buscar uma store que não existe"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Stores - Missing Parameters",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/search?lat=-23.550520",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"search"
+							],
+							"query": [
+								{
+									"key": "lat",
+									"value": "-23.550520"
+								}
+							]
+						},
+						"description": "Tenta buscar stores sem todos os parâmetros obrigatórios"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Products - Missing Query",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products/search?lat=-23.550520&lng=-46.633308&radius=5.0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"products",
+								"search"
+							],
+							"query": [
+								{
+									"key": "lat",
+									"value": "-23.550520"
+								},
+								{
+									"key": "lng",
+									"value": "-46.633308"
+								},
+								{
+									"key": "radius",
+									"value": "5.0"
+								}
+							]
+						},
+						"description": "Tenta buscar produtos sem o parâmetro de query obrigatório"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Log da requisição para debug",
+					"console.log('Request:', pm.request.method, pm.request.url);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Testes básicos de resposta",
+					"pm.test('Status code is valid', function () {",
+					"    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204, 400, 404, 500]);",
+					"});",
+					"",
+					"pm.test('Response time is less than 5000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"// Se a resposta for JSON, testar se é válida",
+					"if (pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').includes('application/json')) {",
+					"    pm.test('Response is valid JSON', function () {",
+					"        pm.response.to.have.jsonBody();",
+					"    });",
+					"}",
+					"",
+					"// Para respostas de sucesso, verificar se não há erro",
+					"if (pm.response.code === 200 || pm.response.code === 201) {",
+					"    pm.test('Response does not contain error', function () {",
+					"        const jsonData = pm.response.json();",
+					"        pm.expect(jsonData).to.not.have.property('error');",
+					"    });",
+					"}",
+					"",
+					"// Para respostas de erro, verificar se há mensagem de erro",
+					"if (pm.response.code === 400 || pm.response.code === 404 || pm.response.code === 500) {",
+					"    pm.test('Response contains error message', function () {",
+					"        const jsonData = pm.response.json();",
+					"        pm.expect(jsonData).to.have.property('error');",
+					"    });",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080/api/v1",
+			"type": "string",
+			"description": "URL base da API"
+		},
+		{
+			"key": "store_id",
+			"value": "",
+			"type": "string",
+			"description": "ID da store criada (será preenchido automaticamente)"
+		},
+		{
+			"key": "product_id",
+			"value": "",
+			"type": "string",
+			"description": "ID do produto criado (será preenchido automaticamente)"
+		},
+		{
+			"key": "category_id",
+			"value": "550e8400-e29b-41d4-a716-446655440000",
+			"type": "string",
+			"description": "ID de categoria de exemplo"
+		}
+	]
+} 

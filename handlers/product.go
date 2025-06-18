@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,6 +11,7 @@ import (
 	"geosearch-poc/repository"
 	"geosearch-poc/service"
 
+	retail "cloud.google.com/go/retail/apiv2/retailpb"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -79,6 +82,17 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create product"})
 		return
 	}
+
+	// Index in Retail Search (async to avoid blocking the response)
+	go func() {
+		ctx := context.Background()
+		if err := h.indexProductInRetailSearch(ctx, product); err != nil {
+			// Log error but don't fail the request
+			log.Printf("Failed to index product %s in Retail Search: %v", product.ID, err)
+		} else {
+			log.Printf("Successfully indexed product %s in Retail Search", product.ID)
+		}
+	}()
 
 	c.JSON(http.StatusCreated, product)
 }
@@ -165,6 +179,17 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Update in Retail Search (async to avoid blocking the response)
+	go func() {
+		ctx := context.Background()
+		if err := h.updateProductInRetailSearch(ctx, product); err != nil {
+			// Log error but don't fail the request
+			log.Printf("Failed to update product %s in Retail Search: %v", product.ID, err)
+		} else {
+			log.Printf("Successfully updated product %s in Retail Search", product.ID)
+		}
+	}()
+
 	c.JSON(http.StatusOK, product)
 }
 
@@ -180,6 +205,17 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete product"})
 		return
 	}
+
+	// Remove from Retail Search (async to avoid blocking the response)
+	go func() {
+		ctx := context.Background()
+		if err := h.removeProductFromRetailSearch(ctx, id.String()); err != nil {
+			// Log error but don't fail the request
+			log.Printf("Failed to remove product %s from Retail Search: %v", id, err)
+		} else {
+			log.Printf("Successfully removed product %s from Retail Search", id)
+		}
+	}()
 
 	c.Status(http.StatusNoContent)
 }
@@ -251,4 +287,69 @@ func (h *ProductHandler) Search(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// indexProductInRetailSearch indexes a product in Vertex AI Retail Search
+func (h *ProductHandler) indexProductInRetailSearch(ctx context.Context, product *domain.Product) error {
+	// Convert domain product to Retail Search product
+	retailProduct := h.convertToRetailProduct(product)
+
+	// Create product in Retail Search
+	return h.productSearchSvc.GetVertexAIClient().CreateProduct(ctx, retailProduct)
+}
+
+// updateProductInRetailSearch updates a product in Vertex AI Retail Search
+func (h *ProductHandler) updateProductInRetailSearch(ctx context.Context, product *domain.Product) error {
+	// Convert domain product to Retail Search product
+	retailProduct := h.convertToRetailProduct(product)
+
+	// Update product in Retail Search
+	return h.productSearchSvc.GetVertexAIClient().UpdateProduct(ctx, retailProduct)
+}
+
+// removeProductFromRetailSearch removes a product from Vertex AI Retail Search
+func (h *ProductHandler) removeProductFromRetailSearch(ctx context.Context, productID string) error {
+	return h.productSearchSvc.GetVertexAIClient().DeleteProduct(ctx, productID)
+}
+
+// convertToRetailProduct converts a domain product to Retail Search format
+func (h *ProductHandler) convertToRetailProduct(product *domain.Product) *retail.Product {
+	retailProduct := &retail.Product{
+		Id:          product.ID.String(),
+		Title:       product.Name,
+		Description: product.Description,
+		PriceInfo: &retail.PriceInfo{
+			Price:        float32(product.Price), // Convert to float32
+			CurrencyCode: "BRL",
+		},
+		Categories: []string{product.Category},
+		Brands:     []string{product.Brand},
+		Gtin:       product.SKU,
+		Availability: func() retail.Product_Availability {
+			if product.Stock > 0 {
+				return retail.Product_IN_STOCK
+			}
+			return retail.Product_OUT_OF_STOCK
+		}(),
+		Attributes: map[string]*retail.CustomAttribute{
+			"store_id": {
+				Text: []string{product.StoreID.String()},
+			},
+			"h3_index": {
+				Text: []string{product.H3Index},
+			},
+		},
+	}
+
+	// Add images if available
+	if len(product.Images) > 0 {
+		retailProduct.Images = make([]*retail.Image, len(product.Images))
+		for i, imgURL := range product.Images {
+			retailProduct.Images[i] = &retail.Image{
+				Uri: imgURL,
+			}
+		}
+	}
+
+	return retailProduct
 }
